@@ -57,11 +57,14 @@ bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Set(const std::string &key, const std::string &value) {
+        if(key.size() + value.size() > _max_size) {
+            return false;
+        }
         auto node = _lru_index.find(key);
         if(node == _lru_index.end()) {
             return false;
         }
-        std::size_t new_size = value.size() - (node->second).get().value.size();
+        int new_size = value.size() - (node->second).get().value.size();
         node_to_head(&node->second.get());
         while(current_size + new_size > _max_size) {
             delete_last();

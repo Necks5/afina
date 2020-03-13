@@ -17,12 +17,11 @@ namespace Backend {
  */
 class SimpleLRU : public Afina::Storage {
 public:
-    SimpleLRU(size_t max_size = 1024) : _max_size(max_size), current_size(0) {}
+    SimpleLRU(size_t max_size = 1024) : _max_size(max_size), current_size(0), top(nullptr) {}
 
     ~SimpleLRU() {
-        int num_el = _lru_index.size();
         _lru_index.clear();
-        for(int i = 0; i < num_el; i++) {
+        while(top && top != _lru_head.get()) {
             delete_last();
         }
         _lru_head.reset(); // TODO: Here is stack overflow
