@@ -11,23 +11,21 @@ bool SimpleLRU::Put(const std::string &key, const std::string &value) {
         }
         auto node = _lru_index.find(key);
         if(node != _lru_index.end()) {
-            std::size_t new_size = value.size() - (node->second).get().value.size();
+            int delta_size = value.size() - (node->second).get().value.size();
             node_to_head(&node->second.get());
-            while(current_size + new_size > _max_size) {
+            while(_current_size + delta_size > _max_size) {
                 delete_last();
             }
             node->second.get().value = value;
-            current_size += new_size;
+            _current_size += delta_size;
         } else {
-            while(current_size + node_size > _max_size) {
+            while(_current_size + node_size > _max_size) {
                 delete_last();
             }
             lru_node* new_node = new lru_node{key, value, nullptr, nullptr};
-            // new_node->key = key;
-            // new_node->value = value;
-            _lru_index.insert({std::reference_wrapper<const std::string>(new_node->key), std::reference_wrapper<lru_node>(*new_node)});
             insert_node(new_node);
-            current_size += node_size;
+            _lru_index.insert({std::reference_wrapper<const std::string>(new_node->key), std::reference_wrapper<lru_node>(*new_node)});
+            _current_size += node_size;
         }
         return true;
 }
@@ -42,15 +40,13 @@ bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
         if(node != _lru_index.end()) {
             return false;
         }
-        while(current_size + node_size > _max_size) {
+        while(_current_size + node_size > _max_size) {
             delete_last();
         }
         lru_node* new_node = new lru_node{key, value, nullptr, nullptr};
-        // new_node->key = key;
-        // new_node->value = value;
-        _lru_index.insert({std::reference_wrapper<const std::string>(new_node->key), std::reference_wrapper<lru_node>(*new_node)});
         insert_node(new_node);
-        current_size += node_size;
+        _lru_index.insert({std::reference_wrapper<const std::string>(new_node->key), std::reference_wrapper<lru_node>(*new_node)});
+        _current_size += node_size;
 
         return true;
 }
@@ -64,13 +60,13 @@ bool SimpleLRU::Set(const std::string &key, const std::string &value) {
         if(node == _lru_index.end()) {
             return false;
         }
-        int new_size = value.size() - (node->second).get().value.size();
+        int delta_size = value.size() - (node->second).get().value.size();
         node_to_head(&node->second.get());
-        while(current_size + new_size > _max_size) {
+        while(_current_size + delta_size > _max_size) {
             delete_last();
         }
         node->second.get().value = value;
-        current_size += new_size;
+        _current_size += delta_size;
 
         return true;
 }
@@ -89,17 +85,17 @@ bool SimpleLRU::Delete(const std::string &key) {
                 node->next.get()->prev = nullptr;
                 _lru_head = std::move(node->next);
             } else {  //last (only one element in LRU)
-                _lru_head.reset(nullptr);
-                top = nullptr;
+                _lru_head.reset();
+                _tail = nullptr;
             }
         } else if(!node->next.get()) { //last element
-            top = node->prev;
-            node->prev->next = std::move(nullptr);
+            _tail = node->prev;
+            node->prev->next.reset();
         } else { //poseredine
             node->next.get()->prev = node->prev;
             node->prev->next = std::move(node->next);
         }
-        current_size -= node_size;
+        _current_size -= node_size;
         return true;
 }
 
@@ -116,23 +112,23 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) {
 
 
 void SimpleLRU::delete_last() {
-    lru_node* del_node = top;
+    lru_node* del_node = _tail;
     std::size_t del_size = del_node->key.size() + del_node->value.size();
     _lru_index.erase(del_node->key);
-    if(_lru_head.get() == top) {
+    if(_lru_head.get() == _tail) {
         _lru_head.reset(nullptr);
     } else {
-        top = top->prev;
-        top->next.reset(nullptr);
+        _tail = _tail->prev;
+        _tail->next.reset(nullptr);
     }
-    current_size -= del_size;
+    _current_size -= del_size;
 }
 
 void SimpleLRU::insert_node(lru_node *node) {
     if(_lru_head.get()) {
         _lru_head.get()->prev = node;
     } else {
-        top = node;
+        _tail = node;
     }
     node->next = std::move(_lru_head);
     _lru_head.reset(node);
@@ -143,14 +139,13 @@ void SimpleLRU::node_to_head(lru_node* node) {
         return;
     }
     if(!node->next.get()) { //last
-        top = node->prev;
+        _tail = node->prev;
         // std::cout << "last\n";
         _lru_head.get()->prev = node;
         node->next = std::move(_lru_head);
         _lru_head = std::move(node->prev->next);
 
     } else {
-        // std::cout << "ne last\n";
         auto temp_head = std::move(_lru_head);
         _lru_head = std::move(node->prev->next);
         node->prev->next = std::move(node->next);
