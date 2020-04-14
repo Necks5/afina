@@ -5,6 +5,7 @@
 #include <mutex>
 #include <thread>
 #include <list>
+#include <set>
 #include <condition_variable>
 
 #include <afina/network/Server.h>
@@ -59,8 +60,9 @@ private:
     uint32_t _max_workers;
     uint32_t _cur_workers;
     std::mutex _access;
-
     std::condition_variable _cv;
+
+    std::set<int> _client_socket_set;
 
     void work(int client_socket);
 

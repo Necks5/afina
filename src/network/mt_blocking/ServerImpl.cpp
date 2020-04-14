@@ -82,6 +82,9 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers = 1)
 void ServerImpl::Stop() {
     running.store(false);
     shutdown(_server_socket, SHUT_RDWR);
+    for (auto cl_sock : _client_socket_set) {
+        shutdown(cl_sock, SHUT_RD);
+    }
 }
 
 // See Server.h
@@ -138,27 +141,24 @@ void ServerImpl::OnRun() {
             setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
         }
 
-        // TODO: Start new thread and process data from/to connection
+        bool need_new_thread = false; //some optimization
         {
             std::lock_guard<std::mutex> l(_access);
+
             if(_cur_workers < _max_workers) {
-                std::thread th(&ServerImpl::work, this, client_socket);
-                th.detach();
                 _cur_workers++;
-            } else {
-                close(client_socket);
+                need_new_thread = true;
+                _client_socket_set.insert(client_socket);
             }
+        }
+        if(need_new_thread) {
+            std::thread th(&ServerImpl::work, this, client_socket);
+            th.detach();
+        } else {
+            close(client_socket);
         }
 
 
-
-//        {
-//            static const std::string msg = "TODO: start new thread and process memcached protocol instead";
-//            if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
-//                _logger->error("Failed to write response to client: {}", strerror(errno));
-//            }
-//            close(client_socket);
-//        }
     }
 
     // Cleanup on exit...
@@ -180,7 +180,7 @@ void ServerImpl::work(int client_socket) {
     try {
         int readed_bytes = -1;
         char client_buffer[4096];
-        while ((readed_bytes = read(client_socket, client_buffer, sizeof(client_buffer))) > 0) {
+        while (running.load() && (readed_bytes = read(client_socket, client_buffer, sizeof(client_buffer))) > 0) {
             _logger->debug("Got {} bytes from socket", readed_bytes);
 
             // Single block of data readed from the socket could trigger inside actions a multiple times,
@@ -259,9 +259,10 @@ void ServerImpl::work(int client_socket) {
 
     {
         std::lock_guard<std::mutex> l(_access);
+        _client_socket_set.erase(client_socket);
         _cur_workers--;
-        if(_cur_workers == 0) {
-            _cv.notify_all();
+        if(running.load() && _cur_workers == 0) {
+            _cv.notify_one();
         }
     }
 }
