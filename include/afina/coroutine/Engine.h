@@ -148,7 +148,7 @@ public:
             if (alive == nullptr) {
                 _unblocker(*this);
             }
-
+            cur_routine = idle_ctx;
             // Here: correct finish of the coroutine section
             yield();
         } else if (pc != nullptr) {
