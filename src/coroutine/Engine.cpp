@@ -61,5 +61,71 @@ void Engine::sched(void *routine_) {
     Restore(*nextCoro);
 }
 
+void Engine::block(void *coro) {
+    context* for_block = static_cast<context *>(coro);
+    if(coro == nullptr) {
+        for_block = cur_routine;
+    }
+    if(for_block->is_bloking) {
+        return;
+    }
+    for_block->is_bloking = true;
+    // delete coroutine from the list of alive coroutines
+    if (alive == for_block) {
+        alive = alive->next;
+    }
+    if (for_block->prev != nullptr) {
+        for_block->prev->next = for_block->next;
+    }
+    if (for_block->next != nullptr) {
+        for_block->next->prev = for_block->prev;
+    }
+    // add coroutine to the list of blocked coroutines
+    for_block->prev = nullptr;
+    for_block->next = blocked;
+    blocked = for_block;
+    if (blocked->next != nullptr) {
+        blocked->next->prev = for_block;
+    }
+    if (for_block == cur_routine) {
+        if (cur_routine != nullptr && cur_routine != idle_ctx) {
+            if (setjmp(cur_routine->Environment) > 0) {
+                return;
+            }
+            Store(*cur_routine);
+        }
+        cur_routine = nullptr;
+        Restore(*idle_ctx);
+    }
+
+}
+
+void Engine::unblock(void *coro) {
+    context * for_unblock = static_cast<context *>(coro);
+    if (for_unblock == nullptr || !for_unblock->is_bloking) {
+        return;
+    }
+    for_unblock->is_bloking = false;
+    if (blocked == for_unblock) {
+        blocked = blocked->next;
+    }
+    if (for_unblock->prev != nullptr) {
+        for_unblock->prev->next = for_unblock->next;
+    }
+    if (for_unblock->next != nullptr) {
+        for_unblock->next->prev = for_unblock->prev;
+    }
+    // add coroutine to the list of alive coroutines
+    for_unblock->prev = nullptr;
+    for_unblock->next = alive;
+    alive = for_unblock;
+    if (alive->next != nullptr) {
+        alive->next->prev = for_unblock;
+    }
+
+
+}
+
+
 } // namespace Coroutine
 } // namespace Afina

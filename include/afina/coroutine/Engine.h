@@ -39,6 +39,7 @@ private:
         // Saved coroutine context (registers)
         jmp_buf Environment;
 
+        bool is_bloking = false;
         // To include routine in the different lists, such as "alive", "blocked", e.t.c
         struct context *prev = nullptr;
         struct context *next = nullptr;
