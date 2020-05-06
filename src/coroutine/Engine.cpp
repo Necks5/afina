@@ -70,7 +70,7 @@ void Engine::block(void *coro) {
         return;
     }
     for_block->is_bloking = true;
-    // delete coroutine from the list of alive coroutines
+
     if (alive == for_block) {
         alive = alive->next;
     }
@@ -80,22 +80,11 @@ void Engine::block(void *coro) {
     if (for_block->next != nullptr) {
         for_block->next->prev = for_block->prev;
     }
-    // add coroutine to the list of blocked coroutines
     for_block->prev = nullptr;
     for_block->next = blocked;
     blocked = for_block;
     if (blocked->next != nullptr) {
         blocked->next->prev = for_block;
-    }
-    if (for_block == cur_routine) {
-        if (cur_routine != nullptr && cur_routine != idle_ctx) {
-            if (setjmp(cur_routine->Environment) > 0) {
-                return;
-            }
-            Store(*cur_routine);
-        }
-        cur_routine = nullptr;
-        Restore(*idle_ctx);
     }
 
 }
@@ -115,7 +104,6 @@ void Engine::unblock(void *coro) {
     if (for_unblock->next != nullptr) {
         for_unblock->next->prev = for_unblock->prev;
     }
-    // add coroutine to the list of alive coroutines
     for_unblock->prev = nullptr;
     for_unblock->next = alive;
     alive = for_unblock;
