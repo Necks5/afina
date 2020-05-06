@@ -38,25 +38,26 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers = 1)
     _logger = pLogging->select("network");
     _logger->info("Start mt_blocking network service");
 
-    _max_workers = n_workers;
-    _cur_workers  = 0;
-    sigset_t sig_mask;
-    sigemptyset(&sig_mask);
-    sigaddset(&sig_mask, SIGPIPE);
-    if (pthread_sigmask(SIG_BLOCK, &sig_mask, NULL) != 0) {
-        throw std::runtime_error("Unable to mask SIGPIPE");
-    }
+        _max_workers = n_workers;
+        _cur_workers = 0;
+        sigset_t sig_mask;
+        sigemptyset(&sig_mask);
+        sigaddset(&sig_mask, SIGPIPE);
+        if (pthread_sigmask(SIG_BLOCK, &sig_mask, NULL) != 0) {
+            throw std::runtime_error("Unable to mask SIGPIPE");
+        }
 
-    struct sockaddr_in server_addr;
-    std::memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;         // IPv4
-    server_addr.sin_port = htons(port);       // TCP port number
-    server_addr.sin_addr.s_addr = INADDR_ANY; // Bind to any address
 
-    _server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (_server_socket == -1) {
-        throw std::runtime_error("Failed to open socket");
-    }
+        struct sockaddr_in server_addr;
+        std::memset(&server_addr, 0, sizeof(server_addr));
+        server_addr.sin_family = AF_INET;         // IPv4
+        server_addr.sin_port = htons(port);       // TCP port number
+        server_addr.sin_addr.s_addr = INADDR_ANY; // Bind to any address
+
+        _server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (_server_socket == -1) {
+            throw std::runtime_error("Failed to open socket");
+        }
 
     int opts = 1;
     if (setsockopt(_server_socket, SOL_SOCKET, SO_REUSEADDR, &opts, sizeof(opts)) == -1) {

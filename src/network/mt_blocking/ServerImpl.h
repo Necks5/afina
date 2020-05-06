@@ -56,6 +56,7 @@ private:
 
     // Thread to run network on
     std::thread _thread;
+    
 
     uint32_t _max_workers;
     uint32_t _cur_workers;
