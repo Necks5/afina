@@ -21,6 +21,7 @@ namespace MTnonblock {
 
 // See Connection.h
 void Connection::Start() {
+    std::lock_guard<std::mutex> lock(_mutex);
     _logger->debug("Connection on {} socket started", _socket);
     _event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
     _event.data.fd = _socket;
@@ -29,19 +30,22 @@ void Connection::Start() {
 
 // See Connection.h
 void Connection::OnError() {
+        std::lock_guard<std::mutex> lock(_mutex);
     _logger->error("Connection on {} socket has error", _socket);
     _is_alive.store(false);
 }
 
 // See Connection.h
 void Connection::OnClose() {
+        std::lock_guard<std::mutex> lock(_mutex);
     _logger->debug("Connection on {} socket closed", _socket);
     _is_alive.store(false);
 }
 
 // See Connection.h
 void Connection::DoRead() {
-    std::size_t arg_remains;
+        std::lock_guard<std::mutex> lock(_mutex);
+        std::size_t arg_remains;
     Protocol::Parser parser;
     std::string argument_for_command;
     try {
@@ -125,6 +129,7 @@ void Connection::DoRead() {
 
 // See Connection.h
 void Connection::DoWrite() {
+        std::lock_guard<std::mutex> lock(_mutex);
     _logger->debug("Do write on {}", _socket);
     int size = buffer.size();
     struct iovec iovecs[size];

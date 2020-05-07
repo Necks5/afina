@@ -51,6 +51,7 @@ private:
     std::shared_ptr<spdlog::logger> _logger;
     std::shared_ptr<Afina::Storage> pStorage;
 
+    std::mutex _mutex;
     std::atomic<bool> _is_alive;
     std::unique_ptr<Execute::Command> command_to_execute;
     char client_buffer[4096];
