@@ -59,7 +59,6 @@ private:
     
 
     uint32_t _max_workers;
-    uint32_t _cur_workers;
     std::mutex _access;
     std::condition_variable _cv;
 
