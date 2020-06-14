@@ -30,7 +30,7 @@ void Connection::Start() {
 
 // See Connection.h
 void Connection::OnError() {
-        std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _logger->error("Connection on {} socket has error", _socket);
     _is_alive.store(false);
 }
@@ -46,16 +46,16 @@ void Connection::OnClose() {
 void Connection::DoRead() {
         std::lock_guard<std::mutex> lock(_mutex);
         std::size_t arg_remains;
-    Protocol::Parser parser;
-    std::string argument_for_command;
-    try {
-        int readed_bytes = -1;
-        while ((readed_bytes = read(_socket, client_buffer + now_pos, sizeof(client_buffer) - now_pos)) > 0) {
-            _logger->debug("Got {} bytes from socket", readed_bytes);
-            now_pos += readed_bytes;
-            // Single block of data readed from the socket could trigger inside actions a multiple times,
-            // for example:
-            // - read#0: [<command1 start>]
+        Protocol::Parser parser;
+        std::string argument_for_command;
+        try {
+            int readed_bytes = -1;
+            while ((readed_bytes = read(_socket, client_buffer + now_pos, sizeof(client_buffer) - now_pos)) > 0) {
+                _logger->debug("Got {} bytes from socket", readed_bytes);
+                now_pos += readed_bytes;
+                // Single block of data readed from the socket could trigger inside actions a multiple times,
+                // for example:
+                // - read#0: [<command1 start>]
             // - read#1: [<command1 end> <argument> <command2> <argument for command 2> <command3> ... ]
             while (now_pos > 0) {
                 _logger->debug("Process {} bytes", now_pos);
@@ -104,7 +104,10 @@ void Connection::DoRead() {
                     // Send response
                     result += "\r\n";
                     buffer.push_back(result);
-                    _event.events |= EPOLLOUT;
+
+                    if (buffer.size() == 1) {
+                        _event.events |= EPOLLOUT;
+                    }
 
                     // Prepare for the next command
                     command_to_execute.reset();
@@ -132,19 +135,21 @@ void Connection::DoWrite() {
         std::lock_guard<std::mutex> lock(_mutex);
     _logger->debug("Do write on {}", _socket);
     int size = buffer.size();
+        size = (size > 512) ? 512 : size;
     struct iovec iovecs[size];
     for (int i = 0; i < size; i++) {
         iovecs[i].iov_len = buffer[i].size();
         iovecs[i].iov_base = &(buffer[i][0]);
     }
 
-    iovecs[0].iov_base = static_cast<char *>(iovecs[0].iov_base) + cur_pos;
+        iovecs[0].iov_base = static_cast<char *>(iovecs[0].iov_base) + cur_pos;
+        iovecs[0].iov_len -= cur_pos;
 
     int write_bytes = writev(_socket, iovecs, size);
 
     if (write_bytes <= 0) {
-        _is_alive.store(false);
-        throw std::runtime_error("Failed to send response");
+        _logger->error("Failed to send response");
+        this->OnError();
     }
 
     cur_pos += write_bytes;
