@@ -20,11 +20,6 @@ class Engine final {
 public:
     using unblocker_func = std::function<void(Engine &)>;
 
-private:
-    /**
-     * A single coroutine instance which could be scheduled for execution
-     * should be allocated on heap
-     */
     struct context;
     typedef struct context {
         // coroutine stack start address
@@ -44,6 +39,12 @@ private:
         struct context *prev = nullptr;
         struct context *next = nullptr;
     } context;
+private:
+    /**
+     * A single coroutine instance which could be scheduled for execution
+     * should be allocated on heap
+     */
+
 
     /**
      * Where coroutines stack begins
@@ -90,9 +91,13 @@ protected:
 
 public:
     Engine(unblocker_func unblocker = null_unblocker)
-        : StackBottom(0), cur_routine(nullptr), alive(nullptr), _unblocker(unblocker) {}
+            : StackBottom(0), cur_routine(nullptr), alive(nullptr), _unblocker(unblocker) {}
+
     Engine(Engine &&) = delete;
+
     Engine(const Engine &) = delete;
+
+    ~Engine() {};
 
     /**
      * Gives up current routine execution and let engine to schedule other one. It is not defined when

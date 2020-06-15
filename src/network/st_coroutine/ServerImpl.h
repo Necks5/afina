@@ -3,16 +3,20 @@
 
 #include <thread>
 #include <vector>
+#include <set>
 
+#include "Connection.h"
+#include "Utils.h"
 #include <afina/network/Server.h>
+#include <afina/coroutine/Engine.h>
 
 namespace spdlog {
-class logger;
+    class logger;
 }
 
 namespace Afina {
-namespace Network {
-namespace STcoroutine {
+    namespace Network {
+        namespace STcoroutine {
 
 // Forward declaration, see Worker.h
 class Worker;
@@ -55,8 +59,13 @@ private:
     int _event_fd;
 
     // IO thread
-    std::thread _work_thread;
-};
+//    std::thread _work_thread;
+
+                Afina::Coroutine::Engine engine;
+                std::set<Connection *> connections;
+
+
+            };
 
 } // namespace STcoroutine
 } // namespace Network

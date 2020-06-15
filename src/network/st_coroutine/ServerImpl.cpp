@@ -70,34 +70,44 @@ void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) 
     }
 
     make_socket_non_blocking(_server_socket);
-    if (listen(_server_socket, 5) == -1) {
-        close(_server_socket);
-        throw std::runtime_error("Socket listen() failed: " + std::string(strerror(errno)));
-    }
+        if (listen(_server_socket, 5) == -1) {
+            close(_server_socket);
+            throw std::runtime_error("Socket listen() failed: " + std::string(strerror(errno)));
+        }
 
-    _event_fd = eventfd(0, EFD_NONBLOCK);
-    if (_event_fd == -1) {
-        throw std::runtime_error("Failed to create epoll file descriptor: " + std::string(strerror(errno)));
-    }
+        _event_fd = eventfd(0, EFD_NONBLOCK);
+        if (_event_fd == -1) {
+            throw std::runtime_error("Failed to create epoll file descriptor: " + std::string(strerror(errno)));
+        }
 
-    _work_thread = std::thread(&ServerImpl::OnRun, this);
-}
+//    _work_thread = std::thread(&ServerImpl::OnRun, this);
+        engine.start(ServerImpl::OnRun);
+
+    }
 
 // See Server.h
 void ServerImpl::Stop() {
-    _logger->warn("Stop network service");
+        _logger->warn("Stop network service");
 
-    // Wakeup threads that are sleep on epoll_wait
-    if (eventfd_write(_event_fd, 1)) {
-        throw std::runtime_error("Failed to wakeup workers");
+        // Wakeup threads that are sleep on epoll_wait
+        if (eventfd_write(_event_fd, 1)) {
+            throw std::runtime_error("Failed to wakeup workers");
+        }
+        for (auto connection : connections) {
+            shutdown(connection->_socket, SHUT_RD);
+        }
+        shutdown(_server_socket, SHUT_RDWR);
     }
-}
 
 // See Server.h
 void ServerImpl::Join() {
-    // Wait for work to be complete
-    _work_thread.join();
-}
+        // Wait for work to be complete
+//    _work_thread.join();
+        for (auto connection : connections) {
+            close(connection->_socket);
+            delete connection;
+        }
+    }
 
 // See ServerImpl.h
 void ServerImpl::OnRun() {
@@ -123,7 +133,9 @@ void ServerImpl::OnRun() {
 
     bool run = true;
     std::array<struct epoll_event, 64> mod_list;
-    while (run) {
+
+
+        while (run) {
         int nmod = epoll_wait(epoll_descr, &mod_list[0], mod_list.size(), -1);
         _logger->debug("Acceptor wokeup: {} events", nmod);
 
@@ -140,6 +152,9 @@ void ServerImpl::OnRun() {
 
             // That is some connection!
             Connection *pc = static_cast<Connection *>(current_event.data.ptr);
+            void *pa = nullptr, *pb = nullptr;
+            pa = engine.run(pc->DoRead());
+            pb = engine.run(pc->DoWrite());
 
             auto old_mask = pc->_event.events;
             if ((current_event.events & EPOLLERR) || (current_event.events & EPOLLHUP)) {
@@ -149,10 +164,12 @@ void ServerImpl::OnRun() {
             } else {
                 // Depends on what connection wants...
                 if (current_event.events & EPOLLIN) {
-                    pc->DoRead();
+                    //pc->DoRead();
+                    pa = engine.run(pc->DoRead, engine);
                 }
                 if (current_event.events & EPOLLOUT) {
-                    pc->DoWrite();
+                    //pc->DoWrite();
+                    pb = engine.run(pc->DoWrite, engine);
                 }
             }
 
@@ -219,6 +236,7 @@ void ServerImpl::OnNewConnection(int epoll_descr) {
                 pc->OnError();
                 delete pc;
             }
+            connections.insert(pc);
         }
     }
 }
