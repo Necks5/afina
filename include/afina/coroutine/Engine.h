@@ -99,6 +99,8 @@ public:
 
     ~Engine() {};
 
+    context *get_cur_routine() { return cur_routine; }
+
     /**
      * Gives up current routine execution and let engine to schedule other one. It is not defined when
      * routine will get execution back, for example if there are no other coroutines then executing could

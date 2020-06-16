@@ -1,14 +1,15 @@
 #ifndef AFINA_NETWORK_ST_COROUTINE_SERVER_H
 #define AFINA_NETWORK_ST_COROUTINE_SERVER_H
 
+#include <arpa/inet.h>
 #include <thread>
 #include <vector>
-#include <set>
 
 #include "Connection.h"
 #include "Utils.h"
-#include <afina/network/Server.h>
 #include <afina/coroutine/Engine.h>
+#include <afina/network/Server.h>
+#include <set>
 
 namespace spdlog {
     class logger;
@@ -18,57 +19,57 @@ namespace Afina {
     namespace Network {
         namespace STcoroutine {
 
-// Forward declaration, see Worker.h
-class Worker;
+            /**
+     * # Network resource manager implementation
+     * Epoll based server
+     */
+            class ServerImpl : public Server {
+            public:
+                ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl);
 
-/**
- * # Network resource manager implementation
- * Epoll based server
- */
-class ServerImpl : public Server {
-public:
-    ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl);
-    ~ServerImpl();
+                ~ServerImpl();
 
-    // See Server.h
-    void Start(uint16_t port, uint32_t acceptors, uint32_t workers) override;
+                // See Server.h
+                void Start(uint16_t port, uint32_t acceptors, uint32_t workers) override;
 
-    // See Server.h
-    void Stop() override;
+                // See Server.h
+                void Stop() override;
 
-    // See Server.h
-    void Join() override;
+                // See Server.h
+                void Join() override;
 
-protected:
-    void OnRun();
-    void OnNewConnection(int);
+            protected:
+                void OnRun();
 
-private:
-    // logger to use
-    std::shared_ptr<spdlog::logger> _logger;
+                void OnNewConnection(int epoll_descr);
 
-    // Port to listen for new connections, permits access only from
-    // inside of accept_thread
-    // Read-only
-    uint16_t listen_port;
+            private:
+                // logger to use
+                std::shared_ptr<spdlog::logger> _logger;
 
-    // Socket to accept new connection on, shared between acceptors
-    int _server_socket;
+                // Port to listen for new connections, permits access only from
+                // inside of accept_thread
+                // Read-only
+                uint16_t listen_port;
 
-    // Curstom event "device" used to wakeup workers
-    int _event_fd;
+                // Socket to accept new connection on, shared between acceptors
+                int _server_socket;
 
-    // IO thread
-//    std::thread _work_thread;
+                // Curstom event "device" used to wakeup workers
+                int _event_fd;
 
-                Afina::Coroutine::Engine engine;
+                int _epoll_descr;
+
+                // IO thread
+                std::thread _work_thread;
                 std::set<Connection *> connections;
 
-
+                Afina::Coroutine::Engine _engine;
+                Afina::Coroutine::Engine::context *_ctx;
             };
 
-} // namespace STcoroutine
-} // namespace Network
+        } // namespace STcoroutine
+    } // namespace Network
 } // namespace Afina
 
 #endif // AFINA_NETWORK_ST_COROUTINE_SERVER_H

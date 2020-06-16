@@ -1,16 +1,14 @@
 #ifndef AFINA_NETWORK_ST_COROUTINE_CONNECTION_H
 #define AFINA_NETWORK_ST_COROUTINE_CONNECTION_H
 
+#include <afina/execute/Command.h>
 #include <cstring>
-#include <string>
-#include <vector>
 
-#include <spdlog/logger.h>
-#include <protocol/Parser.h>
-#include <afina/coroutine/Engine.h>
-
-#include <sys/epoll.h>
 #include <afina/Storage.h>
+#include <afina/coroutine/Engine.h>
+#include <protocol/Parser.h>
+#include <spdlog/logger.h>
+#include <sys/epoll.h>
 
 namespace Afina {
     namespace Network {
@@ -18,12 +16,13 @@ namespace Afina {
 
             class Connection {
             public:
-    Connection(int s) : _socket(s) {
-        std::memset(&_event, 0, sizeof(struct epoll_event));
-        _event.data.ptr = this;
-    }
+                Connection(int s, std::shared_ptr<Afina::Storage> ps, std::shared_ptr<spdlog::logger> lg)
+                        : _socket(s), pStorage(ps), _logger(lg), _is_alive(true) {
+                    std::memset(&_event, 0, sizeof(struct epoll_event));
+                    _event.data.ptr = this;
+                }
 
-                inline bool isAlive() const { return is_alive; }
+                inline bool isAlive() const { return _is_alive; }
 
                 void Start();
 
@@ -32,9 +31,11 @@ namespace Afina {
 
                 void OnClose();
 
-                void DoRead(Afina::Coroutine::Engine &pe);
+                void DoRead();
 
-                void DoWrite(Afina::Coroutine::Engine &pe);
+                void DoWrite();
+
+                void main_proc(Afina::Coroutine::Engine &engine);
 
             private:
                 friend class ServerImpl;
@@ -42,21 +43,26 @@ namespace Afina {
                 int _socket;
                 struct epoll_event _event;
 
-                bool is_alive;
-                int now_pos_bytes = 0;
-                char client_buffer[4096];
-                std::size_t arg_remains;
-                Protocol::Parser parser;
-                std::string argument_for_command;
-                std::unique_ptr<Execute::Command> command_to_execute;
-                std::shared_ptr<Afina::Storage> pStorage;
-                std::shared_ptr<spdlog::logger> _logger;
-                std::vector<std::string> bufer;
-                int pos = 0;
-            };
+                bool _is_alive;
 
-} // namespace STcoroutine
-} // namespace Network
+                std::shared_ptr<spdlog::logger> _logger;
+                std::shared_ptr<Afina::Storage> pStorage;
+
+                Protocol::Parser parser;
+                std::unique_ptr<Execute::Command> command_to_execute;
+                std::size_t arg_remains;
+                std::string argument_for_command;
+
+                int _pos;
+                int cur_pos;
+                std::vector<std::string> bufer;
+
+                Afina::Coroutine::Engine::context *_ctx;
+
+                char client_buffer[4096];
+            };
+        } // namespace STcoroutine
+    } // namespace Network
 } // namespace Afina
 
 #endif // AFINA_NETWORK_ST_COROUTINE_CONNECTION_H
