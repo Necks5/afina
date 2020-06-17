@@ -3,26 +3,32 @@
 #include <setjmp.h>
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 
 namespace Afina {
 namespace Coroutine {
 
 void Engine::Store(context &ctx) {
     char begin_adress;
-    ctx.Hight = StackBottom;
-    ctx.Low = &begin_adress;
+    ctx.Hight = std::max(StackBottom, &begin_adress); //StackBottom;
+    ctx.Low = std::min(StackBottom, &begin_adress); // &begin_adress;
     uint32_t stack_size = ctx.Hight - ctx.Low;
-    std::get<0>(ctx.Stack) = new char[stack_size];
-    std::get<1>(ctx.Stack) = stack_size;
+    if (stack_size != std::get<1>(ctx.Stack)) {
+        if (std::get<0>(ctx.Stack) != nullptr) {
+            delete[] std::get<0>(ctx.Stack);
+        }
+        std::get<0>(ctx.Stack) = new char[stack_size];
+        std::get<1>(ctx.Stack) = stack_size;
+    }
     memcpy(std::get<0>(ctx.Stack), ctx.Low, stack_size);
 }
 
 void Engine::Restore(context &ctx) {
     char begin_adress;
-    cur_routine = &ctx;
     if(&begin_adress <= ctx.Hight && &begin_adress >= ctx.Low) {
         Restore(ctx);
     }
+    cur_routine = &ctx;
     memcpy(ctx.Low, std::get<0>(ctx.Stack), std::get<1>(ctx.Stack));
     longjmp(ctx.Environment, 1);
 }
@@ -43,10 +49,10 @@ void Engine::yield() {
 }
 
 void Engine::sched(void *routine_) {
-    auto nextCoro = static_cast<context *>(routine_);
-    if (nextCoro == nullptr) {
+    if (routine_ == nullptr) {
         yield();
     }
+    auto nextCoro = static_cast<context *>(routine_);
     // we will do nothing if the next coroutine is blocked
     if (nextCoro == cur_routine ) {
         return;
@@ -66,10 +72,7 @@ void Engine::block(void *coro) {
     if(coro == nullptr) {
         for_block = cur_routine;
     }
-    if(for_block->is_bloking) {
-        return;
-    }
-    for_block->is_bloking = true;
+
 
     if (alive == for_block) {
         alive = alive->next;
@@ -91,10 +94,10 @@ void Engine::block(void *coro) {
 
 void Engine::unblock(void *coro) {
     context * for_unblock = static_cast<context *>(coro);
-    if (for_unblock == nullptr || !for_unblock->is_bloking) {
+    if (for_unblock == nullptr) {
         return;
     }
-    for_unblock->is_bloking = false;
+
     if (blocked == for_unblock) {
         blocked = blocked->next;
     }

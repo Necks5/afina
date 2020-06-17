@@ -34,10 +34,13 @@ public:
         // Saved coroutine context (registers)
         jmp_buf Environment;
 
-        bool is_bloking = false;
         // To include routine in the different lists, such as "alive", "blocked", e.t.c
         struct context *prev = nullptr;
         struct context *next = nullptr;
+
+        ~context() {
+            delete[] std::get<0>(Stack);
+        }
     } context;
 private:
     /**
@@ -156,7 +159,7 @@ public:
             if (alive == nullptr) {
                 _unblocker(*this);
             }
-            cur_routine = idle_ctx;
+
             // Here: correct finish of the coroutine section
             yield();
         } else if (pc != nullptr) {
