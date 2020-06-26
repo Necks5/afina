@@ -53,7 +53,7 @@ void Engine::sched(void *routine_) {
         yield();
     }
     auto nextCoro = static_cast<context *>(routine_);
-    // we will do nothing if the next coroutine is blocked
+    
     if (nextCoro == cur_routine ) {
         return;
     }
